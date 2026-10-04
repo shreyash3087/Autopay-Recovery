@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Autopay recovery</title>
+  <style>
+    :root {
+      --bg: #fbfbf9;
+      --fg: #1c1c1a;
+      --mut: #6a6a64;
+      --line: #dcdcd4;
+      --btn: #1c1c1a;
+      --btnfg: #fbfbf9
+    }
+
+    @media(prefers-color-scheme:dark) {
+      :root {
+        --bg: #171715;
+        --fg: #ececE6;
+        --mut: #9a9a92;
+        --line: #2f2f2b;
+        --btn: #ececE6;
+        --btnfg: #171715
+      }
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--fg);
+      font: 14px/1.45 system-ui, sans-serif
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 4px
+    }
+
+    .sub {
+      color: var(--mut);
+      margin: 0 0 16px
+    }
+
+    .bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 16px
+    }
+
+    .stats {
+      margin-left: auto;
+      color: var(--mut)
+    }
+
+    button {
+      font: inherit;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--fg);
+      cursor: pointer
+    }
+
+    button.go {
+      background: var(--btn);
+      color: var(--btnfg);
+      border-color: var(--btn)
+    }
+
+    button:disabled {
+      opacity: .4;
+      cursor: default
+    }
+
+    button:focus-visible,
+    a:focus-visible {
+      outline: 2px solid currentColor;
+      outline-offset: 2px
+    }
+
+    .wrap {
+      overflow-x: auto;
+      border-top: 1px solid var(--line)
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 980px
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top
+    }
+
+    th {
+      font-weight: 600;
+      color: var(--mut)
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 6px
+    }
+
+    .mut {
+      color: var(--mut)
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Autopay recovery</h1>
+  <p class="sub"></p>
+  <div class="bar">
+    <button onclick="post('/api/retry')">Retry no answers</button>
+    <button onclick="if(confirm('Reset all customers?'))post('/api/reset')">Reset all</button>
+    <span class="stats" id="stats"></span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Owes</th>
+          <th>Why it failed</th>
+          <th>Status</th>
+          <th>Tries</th>
+          <th>Last note</th>
+          <th>Role to play</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <script>
+    const COL = { active: "#10b981", recovered: "#16a34a", link_sent: "#2563eb", promised: "#7c3aed", calling: "#d97706", disputed: "#dc2626", escalated: "#dc2626", verification_failed: "#dc2626", do_not_call: "#6b7280", no_answer: "#6b7280", no_resolution: "#6b7280", pending: "#a3a39a", payment_failed: "#dc2626" };
+    const esc = s => String(s ?? "").replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+    async function load() {
+      const d = await (await fetch("/api/customers")).json();
+      document.getElementById("rows").innerHTML = d.map(c => `<tr>
+    <td><strong>${esc(c.name)}</strong><br><span class="mut">${esc(c.email || "")} · postal ${esc(c.postal)}</span></td>
+    <td>Rs ${c.amount}<br><span class="mut">${esc(c.plan)}</span></td>
+    <td>${esc(c.reason)}<br><span class="mut">due ${esc(c.due)}</span></td>
+    <td><span class="dot" style="background:${COL[c.status] || "#a3a39a"}"></span>${esc(c.status.replace(/_/g, " "))}${c.promised_date ? `<br><span class="mut">by ${esc(c.promised_date)}</span>` : ""}${c.pay_link ? `<br><a href="${esc(c.pay_link)}" target="_blank" rel="noopener">payment link</a>` : ""}</td>
+    <td>${c.attempts}/3</td>
+    <td>${esc(c.notes)}</td>
+    <td class="mut">${esc(c.persona)}</td>
+    <td><button class="go" ${["calling", "recovered"].includes(c.status) || c.dnc || c.attempts >= 3 ? "disabled" : ""} onclick="post('/api/call/${c.id}')">Call</button></td></tr>`).join("");
+      const n = k => d.filter(c => c.status === k).length;
+      document.getElementById("stats").textContent = `${n("recovered")} recovered, ${n("link_sent") + n("promised")} in progress, ${n("escalated") + n("disputed")} need a human`;
+    }
+    async function post(u) {
+      const r = await fetch(u, { method: "POST" });
+      if (!r.ok) { const e = await r.json().catch(() => ({})); alert(e.detail || "Request failed") }
+      load();
+    }
+    load(); setInterval(load, 3000);
+  </script>
+</body>
+
+</html>
