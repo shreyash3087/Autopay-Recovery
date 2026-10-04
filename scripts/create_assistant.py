@@ -1,11 +1,13 @@
 import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
-KEY = os.environ["VAPI_PRIVATE_KEY"]
-SECRET = os.getenv("WEBHOOK_SECRET", "change-me")
-HOOK = os.environ["PUBLIC_URL"].rstrip("/") + "/vapi/webhook"
+KEY      = os.environ["VAPI_PRIVATE_KEY"]
+SECRET   = os.getenv("WEBHOOK_SECRET", "change-me")
+HOOK     = os.environ["PUBLIC_URL"].rstrip("/") + "/vapi/webhook"
 EXISTING = os.getenv("VAPI_ASSISTANT_ID", "")
 
 PROMPT = """You are Riya, a polite AI voice assistant for PayEase, a subscription company. You are calling about a failed autopay payment.

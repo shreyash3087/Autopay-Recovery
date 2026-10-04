@@ -2,14 +2,9 @@ import os, sqlite3
 from dotenv import load_dotenv
 
 load_dotenv()
-PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "autopay.db")
 
-
-def conn():
-    c = sqlite3.connect(PATH)
-    c.row_factory = sqlite3.Row
-    return c
-
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PATH = os.path.join(ROOT, "autopay.db")
 
 SEED = [
     (1,  "Aarav Mehta",   1499, "Card expired",             "2026-09-28", "Pro Plan",      "452001", "Cooperative. Agrees to pay now.",                          "shreyash3087@gmail.com"),
@@ -23,6 +18,12 @@ SEED = [
     (9,  "Imran Khan",    1299, "Card expired",             "2026-09-28", "Pro Plan",      "700001", "Does not pick up. Use this to test no answer and retry.", "shreyash3087@gmail.com"),
     (10, "Divya Menon",    899, "Insufficient balance",     "2026-09-30", "Basic Plan",    "380001", "Asks if this is a scam, then cooperates.",                 "shreyash3087@gmail.com"),
 ]
+
+
+def conn():
+    c = sqlite3.connect(PATH)
+    c.row_factory = sqlite3.Row
+    return c
 
 
 def init(reset=False):

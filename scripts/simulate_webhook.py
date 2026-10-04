@@ -1,9 +1,9 @@
-import hashlib, hmac, json, sys, httpx, os
+import hashlib, hmac, json, sys, os, httpx
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"), override=True)
 SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "autopay123")
-URL = "http://localhost:8000/razorpay/webhook"
+URL    = "http://localhost:8000/razorpay/webhook"
 
 cid = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 
@@ -25,7 +25,7 @@ payload = {
 }
 
 body = json.dumps(payload, separators=(",", ":")).encode()
-sig = hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
+sig  = hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
 
 print(f"Sending subscription.pending for customer #{cid} to {URL}")
 r = httpx.post(URL, content=body, headers={

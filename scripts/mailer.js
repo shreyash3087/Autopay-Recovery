@@ -1,7 +1,8 @@
 const nodemailer = require("nodemailer");
+const path = require("path");
 
 try {
-  require("dotenv").config();
+  require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
 } catch (e) {}
 
 async function sendPaymentEmail(to, name, plan, amount, link) {
@@ -50,7 +51,7 @@ async function sendPaymentEmail(to, name, plan, amount, link) {
 if (require.main === module) {
   const [,, to, name, plan, amount, link] = process.argv;
   if (!to || !link) {
-    console.log("Usage: node mailer.js <to_email> <name> <plan> <amount> <link>");
+    console.log("Usage: node scripts/mailer.js <to_email> <name> <plan> <amount> <link>");
     process.exit(1);
   }
   sendPaymentEmail(to, name, plan, amount, link)

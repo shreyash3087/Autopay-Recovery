@@ -8,7 +8,7 @@ Built with FastAPI, Vapi, Razorpay, and Deepgram Nova-3.
 
 ## Architecture
 
-![Architecture Diagram](Architecture_Diagram.jpg)
+![Architecture Diagram](docs/Architecture_Diagram.jpg)
 
 **Event flow:**
 
@@ -27,6 +27,29 @@ Built with FastAPI, Vapi, Razorpay, and Deepgram Nova-3.
 
 ---
 
+## Project Structure
+
+```
+├── app/
+│   ├── __init__.py
+│   ├── main.py          # FastAPI app — routes, Vapi webhook, Razorpay webhook
+│   └── db.py            # SQLite connection and 10 demo customers
+├── scripts/
+│   ├── create_assistant.py   # Creates/updates the Vapi assistant
+│   ├── seed_razorpay.py      # Creates Razorpay test subscriptions
+│   ├── simulate_webhook.py   # Fires a fake subscription.pending webhook locally
+│   └── mailer.js             # Sends payment link emails via Nodemailer
+├── docs/
+│   └── Architecture_Diagram.jpg
+├── static/
+│   └── index.html       # Live operator dashboard
+├── env.example
+├── requirements.txt
+└── package.json
+```
+
+---
+
 ## Setup
 
 ```bash
@@ -35,7 +58,7 @@ python -m venv .venv
 pip install -r requirements.txt
 npm install
 cp env.example .env             # fill in all values
-uvicorn main:app --port 8000
+uvicorn app.main:app --port 8000
 ```
 
 In a second terminal:
@@ -46,7 +69,7 @@ ngrok http 8000
 Update `PUBLIC_URL` in `.env` with the ngrok HTTPS URL, then restart uvicorn.
 
 ```bash
-python create_assistant.py      # creates/updates the Vapi assistant, prints VAPI_ASSISTANT_ID
+python scripts/create_assistant.py   # creates/updates the Vapi assistant, prints VAPI_ASSISTANT_ID
 ```
 
 Paste the printed ID into `.env` as `VAPI_ASSISTANT_ID`, then restart uvicorn again.
@@ -68,8 +91,8 @@ In **Razorpay Dashboard → Account & Settings → Webhooks**:
 ## Creating Test Subscriptions
 
 ```bash
-python seed_razorpay.py 1       # creates a subscription for customer #1 (Aarav Mehta)
-python seed_razorpay.py 1 2 3   # creates subscriptions for customers 1, 2, 3
+python scripts/seed_razorpay.py 1       # creates a subscription for customer #1 (Aarav Mehta)
+python scripts/seed_razorpay.py 1 2 3   # creates subscriptions for customers 1, 2, 3
 ```
 
 Each command prints a subscription ID and an authentication link. Open the link and pay once with a Razorpay test card to activate the subscription.
@@ -84,7 +107,7 @@ To trigger the voice agent:
 ## Simulating Without Razorpay
 
 ```bash
-python simulate_webhook.py 1    # fires a subscription.pending event for customer #1
+python scripts/simulate_webhook.py 1    # fires a subscription.pending event for customer #1
 ```
 
 This signs and posts the webhook payload directly to `localhost:8000/razorpay/webhook`, bypassing Razorpay entirely. Useful for demos or local testing.
@@ -95,12 +118,12 @@ This signs and posts the webhook payload directly to `localhost:8000/razorpay/we
 
 | File | Purpose |
 |---|---|
-| `main.py` | FastAPI app — dashboard API, Vapi webhook handler, tool dispatch, payment link creation, Razorpay webhook |
-| `db.py` | SQLite store and 10 fictional demo customers |
-| `create_assistant.py` | Creates or updates the Vapi assistant with the system prompt and all tool definitions |
-| `seed_razorpay.py` | Creates Razorpay test plans and subscriptions for chosen customers |
-| `simulate_webhook.py` | Simulates a Razorpay `subscription.pending` webhook locally |
-| `mailer.js` | Sends the payment link email via Nodemailer (SMTP) |
+| `app/main.py` | FastAPI app — dashboard API, Vapi webhook handler, tool dispatch, payment link creation, Razorpay webhook |
+| `app/db.py` | SQLite store and 10 fictional demo customers |
+| `scripts/create_assistant.py` | Creates or updates the Vapi assistant with the system prompt and all tool definitions |
+| `scripts/seed_razorpay.py` | Creates Razorpay test plans and subscriptions for chosen customers |
+| `scripts/simulate_webhook.py` | Simulates a Razorpay `subscription.pending` webhook locally |
+| `scripts/mailer.js` | Sends the payment link email via Nodemailer (SMTP) |
 | `static/index.html` | Live operator dashboard — auto-refreshes every 3 seconds |
 | `env.example` | Template for all required environment variables |
 
@@ -112,7 +135,7 @@ This signs and posts the webhook payload directly to `localhost:8000/razorpay/we
 |---|---|---|
 | `VAPI_PRIVATE_KEY` | Yes | Vapi private key |
 | `VAPI_PHONE_NUMBER_ID` | Yes | Vapi outbound phone number ID |
-| `VAPI_ASSISTANT_ID` | Yes | Vapi assistant ID (set after running `create_assistant.py`) |
+| `VAPI_ASSISTANT_ID` | Yes | Vapi assistant ID (set after running `scripts/create_assistant.py`) |
 | `PUBLIC_URL` | Yes | Your public HTTPS URL (ngrok). No trailing slash |
 | `WEBHOOK_SECRET` | Yes | Shared secret between your server and Vapi |
 | `DEMO_PHONE` | Yes | Your own phone number in E.164 format. All 10 demo customers call this number |

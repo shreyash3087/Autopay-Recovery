@@ -7,20 +7,25 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse
 
-import db
+from app import db
 
 load_dotenv()
-VAPI_KEY = os.getenv("VAPI_PRIVATE_KEY", "")
+VAPI_KEY    = os.getenv("VAPI_PRIVATE_KEY", "")
 ASSISTANT_ID = os.getenv("VAPI_ASSISTANT_ID", "")
-PHONE_ID = os.getenv("VAPI_PHONE_NUMBER_ID", "")
-SECRET = os.getenv("WEBHOOK_SECRET", "change-me")
-PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:8000").rstrip("/")
-DEMO_MODE = os.getenv("DEMO_MODE", "1") == "1"
-RZP_ID, RZP_SECRET = os.getenv("RAZORPAY_KEY_ID", ""), os.getenv("RAZORPAY_KEY_SECRET", "")
+PHONE_ID    = os.getenv("VAPI_PHONE_NUMBER_ID", "")
+SECRET      = os.getenv("WEBHOOK_SECRET", "change-me")
+PUBLIC_URL  = os.getenv("PUBLIC_URL", "http://localhost:8000").rstrip("/")
+DEMO_MODE   = os.getenv("DEMO_MODE", "1") == "1"
+RZP_ID      = os.getenv("RAZORPAY_KEY_ID", "")
+RZP_SECRET  = os.getenv("RAZORPAY_KEY_SECRET", "")
+
 MAX_ATTEMPTS = 3
-IST = ZoneInfo("Asia/Kolkata")
-NO_ANSWER = {"customer-did-not-answer", "customer-busy", "voicemail"}
-HERE = os.path.dirname(os.path.abspath(__file__))
+IST          = ZoneInfo("Asia/Kolkata")
+NO_ANSWER    = {"customer-did-not-answer", "customer-busy", "voicemail"}
+
+ROOT         = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR   = os.path.join(ROOT, "static")
+MAILER       = os.path.join(ROOT, "scripts", "mailer.js")
 
 app = FastAPI()
 db.init()
@@ -58,7 +63,7 @@ def call_allowed(cust):
 
 @app.get("/")
 def index():
-    return FileResponse(os.path.join(HERE, "static", "index.html"))
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
 
 
 @app.get("/api/customers")
@@ -123,7 +128,7 @@ async def vapi_webhook(req: Request):
     if kind == "tool-calls":
         results = []
         for tc in msg.get("toolCallList") or msg.get("toolCalls") or []:
-            fn = tc.get("function", {})
+            fn   = tc.get("function", {})
             name = tc.get("name") or fn.get("name")
             args = tc.get("arguments") or fn.get("arguments") or {}
             if isinstance(args, str):
@@ -140,7 +145,7 @@ async def vapi_webhook(req: Request):
 
 
 async def run_tool(name, a):
-    cid = int(a.get("customer_id") or 0)
+    cid  = int(a.get("customer_id") or 0)
     cust = get(cid)
     if not cust:
         return {"error": "unknown customer"}
@@ -195,13 +200,13 @@ async def run_tool(name, a):
 
 def finish_call(msg):
     call = msg.get("call", {})
-    cid = calls.get(call.get("id"))
+    cid  = calls.get(call.get("id"))
     if cid is None:
-        v = (call.get("assistantOverrides") or {}).get("variableValues") or {}
+        v   = (call.get("assistantOverrides") or {}).get("variableValues") or {}
         cid = int(v["customer_id"]) if v.get("customer_id") else None
     if cid is None:
         return
-    cust = get(cid)
+    cust   = get(cid)
     reason = msg.get("endedReason", "")
     if cust["status"] == "calling":
         update(cid, status="no_answer" if reason in NO_ANSWER else "no_resolution", notes=f"Call ended: {reason}")
@@ -211,7 +216,7 @@ def finish_call(msg):
 
 
 async def make_link(cust):
-    link = f"{PUBLIC_URL}/pay/{cust['id']}"
+    link  = f"{PUBLIC_URL}/pay/{cust['id']}"
     email = cust.get("email") or os.getenv("DEMO_EMAIL", "")
     if RZP_ID and RZP_SECRET:
         body = {
@@ -232,10 +237,10 @@ async def make_link(cust):
 async def send_email(to_email, name, plan, amount, link):
     try:
         proc = await asyncio.create_subprocess_exec(
-            "node", "mailer.js", str(to_email), str(name), str(plan), str(amount), str(link),
+            "node", MAILER, str(to_email), str(name), str(plan), str(amount), str(link),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=HERE,
+            cwd=ROOT,
         )
         stdout, _ = await proc.communicate()
         if stdout:
@@ -271,23 +276,24 @@ async def auto_call(cid):
 
 @app.post("/razorpay/webhook")
 async def rzp_webhook(req: Request):
-    raw = await req.body()
+    raw    = await req.body()
     secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
     if secret:
         good = hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(good, req.headers.get("x-razorpay-signature", "")):
             raise HTTPException(401, "Bad signature")
-    data = json.loads(raw)
-    event, payload = data.get("event", ""), data.get("payload", {})
+    data    = json.loads(raw)
+    event   = data.get("event", "")
+    payload = data.get("payload", {})
 
     if event == "payment_link.paid":
         ref = (payload.get("payment_link", {}).get("entity") or {}).get("reference_id", "")
         if ref.startswith("autopay-"):
             update(int(ref.split("-")[1]), status="recovered", notes="Paid via Razorpay link")
 
-    sub = (payload.get("subscription") or {}).get("entity") or {}
+    sub   = (payload.get("subscription") or {}).get("entity") or {}
     notes = sub.get("notes") if isinstance(sub.get("notes"), dict) else {}
-    cid = int(notes.get("customer_id") or 0)
+    cid   = int(notes.get("customer_id") or 0)
     if cid and get(cid):
         if event in ("subscription.pending", "subscription.halted"):
             asyncio.create_task(auto_call(cid))

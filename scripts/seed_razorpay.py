@@ -1,11 +1,13 @@
 import os, sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import httpx
 from dotenv import load_dotenv
-import db
+from app import db
 
 load_dotenv()
 AUTH = (os.environ["RAZORPAY_KEY_ID"], os.environ["RAZORPAY_KEY_SECRET"])
-API = "https://api.razorpay.com/v1"
+API  = "https://api.razorpay.com/v1"
 
 ids = [int(a) for a in sys.argv[1:]] or [1, 2, 3]
 with db.conn() as c:
